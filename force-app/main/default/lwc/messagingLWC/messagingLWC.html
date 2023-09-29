@@ -1,0 +1,55 @@
+<template>
+    <lightning-card>
+        <h3 slot="title">
+            <lightning-icon icon-name="utility:chat" size="small"></lightning-icon>
+            Contact : Shweta Maheshwari Test
+        </h3>
+        <div slot="footer">
+            <div class="slds-var-p-around_medium lgc-bg">
+                <lightning-input type="text" placeholder="Text Message" onchange={handleInputChange}></lightning-input>
+                <lightning-button-icon 
+                    icon-name="utility:send" 
+                    variant="brand" 
+                    alternative-text="Send" 
+                    title="Send"
+                    class={sendButtonClass}   
+                    onclick={handleSendClick}  
+                ></lightning-button-icon>
+            </div>
+        </div>
+        
+        
+        <section role="log" class="slds-chat">
+            <ul class="slds-chat-list">
+                <template for:each={messages} for:item="message">
+                    <template if:true={message.Is_Outbound__c}>
+                        <li key={message.Id} class="slds-chat-listitem slds-chat-listitem_outbound">
+                            <div class="slds-chat-message">
+                                <div class="slds-chat-message__body">
+                                    <div class="slds-chat-message__text slds-chat-message__text_outbound">
+                                        <span>{message.Message_Content__c}</span>
+                                    </div>
+                                    <div class="slds-chat-message__meta"> {message.CreatedDate} </div>
+                                </div>
+                            </div>
+                        </li>
+                    </template>
+                    <template if:false={message.Is_Outbound__c}>
+                        <li key={message.Id} class="slds-chat-listitem slds-chat-listitem_inbound">
+                            <div class="slds-chat-message">
+                                <div class="slds-chat-message__body">
+                                    <div class="slds-chat-message__text slds-chat-message__text_inbound">
+                                        <span>{message.Message_Content__c}</span>
+                                    </div>
+                                    <div class="slds-chat-message__meta">{message.CreatedDate}</div>
+                                </div>
+                            </div>
+                        </li>
+                    </template>
+                    
+                </template>                
+            </ul>
+        </section>
+        
+    </lightning-card>
+</template>
