@@ -1,55 +1,74 @@
 <template>
-    <lightning-card>
-        <h3 slot="title">
-            <lightning-icon icon-name="utility:chat" size="small"></lightning-icon>
-            Contact : Shweta Maheshwari Test
-        </h3>
-        <div slot="footer">
-            <div class="slds-var-p-around_medium lgc-bg">
-                <lightning-input type="text" placeholder="Text Message" onchange={handleInputChange}></lightning-input>
+
+    <!--Modal Header-->
+    <lightning-modal-header >
+        <span>
+            <lightning-icon icon-name="standard:live_chat" size="small"></lightning-icon>
+            <b> Chat with : {contactName}</b>
+        </span>
+    </lightning-modal-header>
+
+    <!--Modal Body-->
+    <lightning-modal-body> 
+        <section role="log" class="slds-chat">
+            <div class="slds-chat-list-container" style="height: 300px; overflow-y: scroll;" onscroll={loadMoreMessages} id="chat-list-wrapper">
+                <div class="slds-chat-list-wrapper">
+                    <ul class="slds-chat-list">
+                        <template for:each={messages} for:item="message">
+                            <template if:true={message.Is_Outbound__c}>
+                                <li key={message.Id} class="slds-chat-listitem slds-chat-listitem_outbound">
+                                    <div class="slds-chat-message">
+                                        <div class="slds-chat-message__body">
+                                            <div class="slds-chat-message__text slds-chat-message__text_outbound">
+                                                <span>{message.Message_Content__c}</span>
+                                                
+                                            </div>
+                                            <template if:false={message.Is_Delivered__c}>
+                                                <lightning-icon icon-name="utility:error" size="xx-small" variant="error" alternative-text="Undelivered!" title="Undelivered"></lightning-icon>
+                                            </template>
+                                            <div class="slds-chat-message__meta"> {message.CreatedDate} 
+                                               
+                                            </div>
+                                        </div>
+                                    </div>
+                                </li>
+                            </template>
+                            <template if:false={message.Is_Outbound__c}>
+                                <li key={message.Id} class="slds-chat-listitem slds-chat-listitem_inbound">
+                                    <div class="slds-chat-message">
+                                        <div class="slds-chat-message__body">
+                                            <div class="slds-chat-message__text slds-chat-message__text_inbound">
+                                                <span>{message.Message_Content__c}</span>
+                                            </div>
+                                            <div class="slds-chat-message__meta">{message.CreatedDate}</div>
+                                        </div>
+                                    </div>
+                                </li>
+                            </template>
+                            
+                        </template>                
+                    </ul>
+                </div>
+            </div>
+        </section>    
+    </lightning-modal-body>
+
+    <!--Modal Footer-->
+    <lightning-modal-footer>
+        <div class="slds-grid slds-gutters">
+            <div class="slds-col slds-size_11-of-12 customCssClass">
+                <lightning-input type="text" placeholder="Text Message" onchange={handleInputChange} value={inputValue}></lightning-input>
+            </div>
+            <div class="slds-col slds-size_1-of-12 customCssClass">
                 <lightning-button-icon 
-                    icon-name="utility:send" 
-                    variant="brand" 
-                    alternative-text="Send" 
-                    title="Send"
-                    class={sendButtonClass}   
-                    onclick={handleSendClick}  
+                icon-name="utility:send" 
+                variant="brand" 
+                alternative-text="Send" 
+                title="Send"
+                onclick={handleSendClick}  
+                disabled={sendButtonClass}
                 ></lightning-button-icon>
             </div>
         </div>
-        
-        
-        <section role="log" class="slds-chat">
-            <ul class="slds-chat-list">
-                <template for:each={messages} for:item="message">
-                    <template if:true={message.Is_Outbound__c}>
-                        <li key={message.Id} class="slds-chat-listitem slds-chat-listitem_outbound">
-                            <div class="slds-chat-message">
-                                <div class="slds-chat-message__body">
-                                    <div class="slds-chat-message__text slds-chat-message__text_outbound">
-                                        <span>{message.Message_Content__c}</span>
-                                    </div>
-                                    <div class="slds-chat-message__meta"> {message.CreatedDate} </div>
-                                </div>
-                            </div>
-                        </li>
-                    </template>
-                    <template if:false={message.Is_Outbound__c}>
-                        <li key={message.Id} class="slds-chat-listitem slds-chat-listitem_inbound">
-                            <div class="slds-chat-message">
-                                <div class="slds-chat-message__body">
-                                    <div class="slds-chat-message__text slds-chat-message__text_inbound">
-                                        <span>{message.Message_Content__c}</span>
-                                    </div>
-                                    <div class="slds-chat-message__meta">{message.CreatedDate}</div>
-                                </div>
-                            </div>
-                        </li>
-                    </template>
-                    
-                </template>                
-            </ul>
-        </section>
-        
-    </lightning-card>
+    </lightning-modal-footer>
 </template>

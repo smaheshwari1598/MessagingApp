@@ -1,0 +1,6 @@
+/* CSS to make elements inline */
+.customCssClass {
+    padding-right: inherit;
+    padding-left: inherit;
+    margin-top: auto;
+}
