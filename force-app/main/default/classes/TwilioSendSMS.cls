@@ -1,9 +1,9 @@
 public class TwilioSendSMS {
     
-    public static String sendSMS(String smsBody, String toNumber){
+    public static HTTPResponse sendSMS(String smsBody, String toNumber){
         
         String namedCredential = 'callout:TwilioConfig'; // Use the Named Credential's name
-        String endPoint = namedCredential + '/AC59acae6e0cfbe113da97890649bf2e87/Messages.json';
+        String endPoint = namedCredential + '/'+Label.Twilio_Acount_Username+'/Messages.json';
         String senderNumber = Constants.SENDER_NUMBER;
         
         HttpRequest req = new HttpRequest();
@@ -21,6 +21,6 @@ public class TwilioSendSMS {
         req.setBody('To=' + EncodingUtil.urlEncode(toNumber, 'UTF-8') + '&From=' + EncodingUtil.urlEncode(senderNumber,'UTF-8') + '&Body=' + smsBody);
         res = http.send(req);
         
-        return String.valueOf(res.getStatusCode());
+        return res;
     }
 }

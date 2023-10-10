@@ -102,4 +102,10 @@ export default class MessagingLWC extends LightningElement {
             this.subscription = response;
         });
     }
+
+    triggerFileInput() {
+        // Trigger the hidden file input
+        const fileInput = this.template.querySelector('input[type="file"]');
+        fileInput.click();
+    }
 }

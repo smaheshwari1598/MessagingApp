@@ -56,7 +56,17 @@
     <!--Modal Footer-->
     <lightning-modal-footer>
         <div class="slds-grid slds-gutters">
-            <div class="slds-col slds-size_11-of-12 customCssClass">
+            <div class="slds-col slds-size_1-of-12 customCssClass">
+                <div class="file-upload-icon" >
+                    <lightning-button-icon icon-name="action:new" size="medium" class="customCssClass"
+                    variant="brand" 
+                    alternative-text="Upload" 
+                    title="Upload"
+                    onclick={triggerFileInput}></lightning-button-icon>
+                </div>
+                <input type="file" accept=".xls,.xlsx,.png,.jpeg,.pdf" class="slds-hide" onchange={handleFileUpload} aura:id="fileInput" />    
+            </div>
+            <div class="slds-col slds-size_10-of-12 customCssClass">
                 <lightning-input type="text" placeholder="Text Message" onchange={handleInputChange} value={inputValue}></lightning-input>
             </div>
             <div class="slds-col slds-size_1-of-12 customCssClass">

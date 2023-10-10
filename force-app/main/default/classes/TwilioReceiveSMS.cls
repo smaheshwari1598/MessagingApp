@@ -21,7 +21,7 @@ global class TwilioReceiveSMS {
         }    
         
         if(String.isNotBlank(fromPhoneNumber)){
-            Contact conRec = [SELECT Id FROM Contact WHERE Phone = :fromPhoneNumber LIMIT 1];
+            Contact conRec = [SELECT Id FROM Contact WHERE Phone = :fromPhoneNumber WITH USER_MODE LIMIT 1 ];
             if (conRec != null) {
                 Message__c messageRec = new Message__c(
                 Is_Outbound__c = false,
@@ -32,7 +32,7 @@ global class TwilioReceiveSMS {
             	);
                 
                 try {
-                    insert messageRec;
+                    insert as User messageRec;
                 } catch (Exception e) {
                     System.debug('Error while saving SMS message: ' + e.getMessage());
                 }
