@@ -4,3 +4,12 @@
     padding-left: inherit;
     margin-top: auto;
 }
+
+.image-preview {
+    text-align: left;
+}
+
+.image-preview img {
+    max-width: 75px;
+    max-height: 200px; /* Adjust as needed */
+}

@@ -3,7 +3,10 @@ import getMessages from '@salesforce/apex/MessagingLWCController.getMessages';
 import createMessage from '@salesforce/apex/MessagingLWCController.createMessage';
 import { refreshApex } from '@salesforce/apex';
 import { subscribe} from 'lightning/empApi';
+import { ShowToastEvent } from 'lightning/platformShowToastEvent';
+import { loadScript } from 'lightning/platformResourceLoader';
 
+const MAX_FILE_SIZE = 100000000; //10mb 
 export default class MessagingLWC extends LightningElement {
 
     inputValue='';
@@ -11,19 +14,23 @@ export default class MessagingLWC extends LightningElement {
     subscription = {};
     error;
     @api recordId;
+    @api fileName;
+    @api fileData;
+    @api fileType;
     @api channelName = '/event/NewMessage__e';
     @api offSetVal='';
     @track messages = [];
     @track contactName;
     @track isLoading = false;
-   
+    @track imageDataUrl='';
+    
     connectedCallback(){
         this.handleSubscribe();
     }
 
     //checks whether show Send Button Enabled or Disabled
     get sendButtonClass() {
-        return this.inputValue.trim() !== '' ? false : true;
+        return (this.inputValue.trim() == '' && this.imageDataUrl.trim() =='') ? true : false;
     }
 
     // Method to get the Messages record related to Contact
@@ -49,14 +56,20 @@ export default class MessagingLWC extends LightningElement {
 
     // Called when User Clicks on Send Icon Button
     handleSendClick() {
-        createMessage({ messageBody: this.inputValue, contactId: this.recordId })
-            .then(() => {
-                this.inputValue = '';
-                refreshApex(this.wiredMessagesResult);
-            })
-            .catch(error => {
-                console.error(error);
-            });
+        this.imageDataUrl = '';
+        console.log('In handleSendClick----');
+        this.createMessageRecord();   
+    }
+
+    createMessageRecord(){
+        createMessage({ messageBody: this.inputValue, contactId: this.recordId, fileName: this.fileName, fileData: this.fileData , fileType : this.fileType})
+        .then(() => {
+            this.inputValue = '';
+            refreshApex(this.wiredMessagesResult);
+        })
+        .catch(error => {
+            console.error(error);
+        });
     }
 
     // JavaScript function to scroll to the bottom of the chat container
@@ -107,5 +120,49 @@ export default class MessagingLWC extends LightningElement {
         // Trigger the hidden file input
         const fileInput = this.template.querySelector('input[type="file"]');
         fileInput.click();
+        console.log('In triggerFileInput');
+
     }
+
+    handleFileUpload(event) {
+        console.log('In handleFileUpload');
+        const file = event.target.files[0];
+        var reader = new FileReader();
+        reader.onload = () => {
+            var base64 = reader.result.split(',')[1];
+            this.fileName = file.name;
+            this.fileData = base64;
+            this.fileType = file.fileType;
+        }
+        reader.readAsDataURL(file); 
+        console.log('this.fileName-----',JSON.stringify(this.fileName));
+        console.log('this.fileData-----',JSON.stringify(this.fileData));
+        console.log('this.FileType-----',JSON.stringify(this.fileType));
+
+        const selectedFile = event.target.files[0];
+        if (selectedFile) {
+            this.readFile(selectedFile);
+        }
+
+    }
+
+    readFile(file) {
+        const reader = new FileReader();
+
+        reader.onload = (event) => {
+            this.imageDataUrl = event.target.result;
+        };
+
+        reader.readAsDataURL(file);
+    }
+
+    showToast(title, message, variant) {
+        const toastEvent = new ShowToastEvent({
+            title: title,
+            message: message,
+            variant: variant,
+        });
+        this.dispatchEvent(toastEvent);
+    }
+
 }

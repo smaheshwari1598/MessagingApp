@@ -1,4 +1,4 @@
-public with sharing class MessagingLWCController {
+public class MessagingLWCController {
     
     @AuraEnabled(cacheable = true)
     public static MessagingWrapper getMessages(String contactId, String offSetValFromUI){
@@ -32,30 +32,78 @@ public with sharing class MessagingLWCController {
     }
     
     @AuraEnabled
-    public static void createMessage(String messageBody,String contactId, String fileName, String fileData){
+    public static void createMessage(String messageBody,String contactId, String fileName, String fileData, String fileType){
         try {
-            Contact conRec = getContactDetails(contactId);
             
-            HttpResponse responseFromSendSMS= TwilioSendSMS.SendSMS(messageBody,String.valueOf(conRec.Phone));
+            String formattedDateString = Datetime.now().formatGMT('EEE, dd MMM yyyy HH:mm:ss z');
+            String mmsSharedUrl = '';
+            String endPointUrl = 'callout:Connect_to_s3' +'/'+ fileName;
+            String contentType= 'image/jpeg';
+            String url = 'callout:Connect_to_S3';
             
-            Message__c messageRec = new Message__c(
-                Is_Outbound__c = true,
-                Message_Content__c = messageBody,
-                Recipient_Number__c = conRec.Phone,
-                Sender_Number__c = Constants.SENDER_NUMBER,
-                Contact__c = contactId);
+            HttpRequest req  = new HttpRequest();
+            HttpResponse resFromS3  = new HttpResponse();
             
-            if(String.ValueOf(responseFromSendSMS.getStatusCode()) == '201'){
-                messageRec.Is_Delivered__c = true;
-            }else{
-                messageRec.Is_Delivered__c = false;
-                System.debug('Error Occured while delievery Message. Error Message----'+responseFromSendSMS.getBody());
+            req.setMethod('PUT');
+            req.setEndpoint(endPointUrl);
+            req.setHeader('Access-Control-Allow-Origin', '*');
+            req.setHeader('Content-Encoding', 'UTF-8');
+            req.setHeader('Content-type', contentType);
+            req.setHeader('Connection', 'keep-alive');
+            req.setHeader('Date', formattedDateString);
+            req.setHeader('ACL', 'READ_ACP');
+            
+            req.setBodyAsBlob(Blob.valueOf(fileData));
+            
+            Http http = new Http();
+            resFromS3 = http.send(req);
+            
+            System.debug('*Resp:' + String.ValueOF(resFromS3.getBody()));
+            System.debug('RESPONSE STRING: ' + resFromS3.toString());
+            System.debug('RESPONSE STATUS: ' + resFromS3.getStatus());
+            System.debug('STATUS_CODE: ' + resFromS3.getStatusCode());
+            
+            Contact contactDetails = getContactDetails(contactId);
+            
+            if(resFromS3.getStatusCode() == 200){
+                String mmsUrl = 'https://mypublicfilesbucketforsalesforce.s3.eu-north-1.amazonaws.com' + '/'+ filename;
+               	Id messageRecId = createMessageRecord(messageBody,contactId);
+                if(String.isNotBlank(fileName) && String.isNotBlank(fileData)){
+                    insertAttachments(fileName,contactId,fileData);
+                }
+                TwilioSendSMS.SendSMS(messageRecId,messageBody,contactDetails.Phone,mmsUrl);
             }
-            insert as user messageRec;
             
         } catch (Exception e) {
             System.debug('Error while saving SMS message: ' + e.getMessage());
         }        
+    }
+    
+    public static void insertAttachments(String fileName, String contactId,String fileData){
+        ContentVersion cVersion = new ContentVersion();
+        cVersion.PathOnClient = fileName;//File name with extention
+        cVersion.FirstPublishLocationId = contactId;  
+        cVersion.Title = fileName;//Name of the file
+        cVersion.VersionData = EncodingUtil.base64Decode(fileData);//File content
+        Insert cVersion;
+        
+        //After saved the Content Verison, get the ContentDocumentId
+        ContentVersion conDocument = [SELECT Id,ContentDocumentId, title FROM ContentVersion WHERE Id =:cVersion.Id];
+        
+        ContentDocument contentDocument = [SELECT FileType FROM ContentDocument WHERE Id = :conDocument.ContentDocumentId LIMIT 1];
+        
+    }
+    
+    public static String createMessageRecord(String messageBody,String contactId){
+        Contact conRec = getContactDetails(contactId);
+        Message__c messageRec = new Message__c(
+            Is_Outbound__c = true,
+            Message_Content__c = messageBody,
+            Recipient_Number__c = conRec.Phone,
+            Sender_Number__c = Constants.SENDER_NUMBER,
+            Contact__c = contactId);
+        insert as user messageRec;
+        return messageRec.Id;
     }
     
     public static Contact getContactDetails(String contactId){
@@ -75,4 +123,6 @@ public with sharing class MessagingLWCController {
             this.defaultOffSet = defaultOffSet;
         }
     }
+    
+    
 }

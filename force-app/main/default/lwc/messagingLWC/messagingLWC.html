@@ -52,10 +52,13 @@
             </div>
         </section>    
     </lightning-modal-body>
-
     <!--Modal Footer-->
     <lightning-modal-footer>
+        <div class="image-preview">
+            <img src={imageDataUrl} if:true={imageDataUrl} alt="Selected Image" />
+        </div>
         <div class="slds-grid slds-gutters">
+           
             <div class="slds-col slds-size_1-of-12 customCssClass">
                 <div class="file-upload-icon" >
                     <lightning-button-icon icon-name="action:new" size="medium" class="customCssClass"
@@ -64,10 +67,12 @@
                     title="Upload"
                     onclick={triggerFileInput}></lightning-button-icon>
                 </div>
-                <input type="file" accept=".xls,.xlsx,.png,.jpeg,.pdf" class="slds-hide" onchange={handleFileUpload} aura:id="fileInput" />    
+                <input type="file" accept=".png,.jpeg,.jpg,.txt" class="slds-hide" onchange={handleFileUpload} aura:id="fileInput" />    
             </div>
             <div class="slds-col slds-size_10-of-12 customCssClass">
-                <lightning-input type="text" placeholder="Text Message" onchange={handleInputChange} value={inputValue}></lightning-input>
+                <lightning-input type="text" placeholder="Text Message" onchange={handleInputChange} value={inputValue}>
+                    
+                </lightning-input>
             </div>
             <div class="slds-col slds-size_1-of-12 customCssClass">
                 <lightning-button-icon 
@@ -80,5 +85,7 @@
                 ></lightning-button-icon>
             </div>
         </div>
+
+        
     </lightning-modal-footer>
 </template>
