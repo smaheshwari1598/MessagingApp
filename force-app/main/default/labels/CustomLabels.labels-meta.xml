@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomLabels xmlns="http://soap.sforce.com/2006/04/metadata">
+    <labels>
+        <fullName>MessagePerPage</fullName>
+        <language>en_US</language>
+        <protected>true</protected>
+        <shortDescription>MessagePerPage</shortDescription>
+        <value>10</value>
+    </labels>
+    <labels>
+        <fullName>Twilio_Acount_Username</fullName>
+        <language>en_US</language>
+        <protected>true</protected>
+        <shortDescription>Twilio Acount Username</shortDescription>
+        <value>AC59acae6e0cfbe113da97890649bf2e87</value>
+    </labels>
+</CustomLabels>

@@ -1,0 +1,16 @@
+{
+  "packageDirectories": [
+    {
+      "path": "ext",
+      "default": false
+    },
+    {
+      "path": "force-app",
+      "default": true
+    }
+  ],
+  "name": "POCConcretioOrg",
+  "namespace": "",
+  "sfdcLoginUrl": "https://login.salesforce.com",
+  "sourceApiVersion": "58.0"
+}

@@ -1,0 +1,103 @@
+<template>
+
+    <!--Modal Header-->
+    <lightning-modal-header >
+        <span>
+            <lightning-icon icon-name="standard:live_chat" size="small"></lightning-icon>
+            <b> Chat with : {contactName}</b>
+        </span>
+    </lightning-modal-header>
+
+    <!--Modal Body-->
+    <lightning-modal-body> 
+        <section role="log" class="slds-chat">
+            <div class="slds-chat-list-container" style="height: 300px; overflow-y: scroll;" onscroll={loadMoreMessages} id="chat-list-wrapper">
+                <div class="slds-chat-list-wrapper">
+                    <ul class="slds-chat-list">
+                        <template for:each={messagesWrapper} for:item="message">
+                            <template if:true={message.messageRec.Is_Outbound__c}>
+                                <li key={message.messageRec.Id} class="slds-chat-listitem slds-chat-listitem_outbound">
+                                    <div class="slds-chat-message">
+                                        <div class="slds-chat-message__body">
+                                            
+                                            <div class="slds-chat-message__text slds-chat-message__text_outbound">
+                                                <span>{message.messageRec.Message_Content__c}</span>
+                                                
+                                                <template if:true={message.attachmentLinks}>
+                                                    <template for:each={message.attachmentLinks} for:item="attachLink">
+                                                        <div class="slds-chat-message__image slds-chat-message__image_outbound" key={message.messageRec.Id}>
+                                                            <div class="image-preview" key={message.messageRec.Id}>
+                                                                <img src={attachLink} if:true={attachLink} alt="Selected Image" />
+                                                            </div>
+                                                        </div>
+                                                    </template>
+                                                </template>
+                                            </div>
+                                            
+                                            
+                                            <template if:false={message.messageRec.Is_Delivered__c}>
+                                                <lightning-icon icon-name="utility:error" size="xx-small" variant="error" alternative-text="Undelivered!" title="Undelivered"></lightning-icon>
+                                            </template>
+                                            <div class="slds-chat-message__meta"> {message.messageRec.CreatedDate} 
+                                               
+                                            </div>
+                                        </div>
+                                    </div>
+                                </li>
+                            </template>
+                            <template if:false={message.messageRec.Is_Outbound__c}>
+                                <li key={message.messageRec.Id} class="slds-chat-listitem slds-chat-listitem_inbound">
+                                    <div class="slds-chat-message">
+                                        <div class="slds-chat-message__body">
+                                            <div class="slds-chat-message__text slds-chat-message__text_inbound">
+                                                <span>{message.messageRec.Message_Content__c}</span>
+                                            </div>
+                                            <div class="slds-chat-message__meta">{message.messageRec.CreatedDate}</div>
+                                        </div>
+                                    </div>
+                                </li>
+                            </template>
+                            
+                        </template>                
+                    </ul>
+                </div>
+            </div>
+        </section>    
+    </lightning-modal-body>
+    <!--Modal Footer-->
+    <lightning-modal-footer>
+        <div class="image-preview">
+            <img src={imageDataUrl} if:true={imageDataUrl} alt="Selected Image" />
+        </div>
+        <div class="slds-grid slds-gutters">
+           
+            <div class="slds-col slds-size_1-of-12 customCssClass">
+                <div class="file-upload-icon" >
+                    <lightning-button-icon icon-name="action:new" size="medium" class="customCssClass"
+                    variant="brand" 
+                    alternative-text="Upload" 
+                    title="Upload"
+                    onclick={triggerFileInput}></lightning-button-icon>
+                </div>
+                <input type="file" accept=".png,.jpeg,.jpg,.txt,.pdf" class="slds-hide" onchange={handleFileUpload} aura:id="fileInput" />    
+            </div>
+            <div class="slds-col slds-size_10-of-12 customCssClass">
+                <lightning-input type="text" placeholder="Text Message" onchange={handleInputChange} value={inputValue}>
+                    
+                </lightning-input>
+            </div>
+            <div class="slds-col slds-size_1-of-12 customCssClass">
+                <lightning-button-icon 
+                icon-name="utility:send" 
+                variant="brand" 
+                alternative-text="Send" 
+                title="Send"
+                onclick={handleSendClick}  
+                disabled={sendButtonClass}
+                ></lightning-button-icon>
+            </div>
+        </div>
+
+        
+    </lightning-modal-footer>
+</template>
