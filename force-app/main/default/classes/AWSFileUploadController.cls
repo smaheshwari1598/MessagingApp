@@ -14,7 +14,7 @@ public class AWSFileUploadController {
             String filename = versions[0].Title;
             
             //Update the content-type based on the file type being attached
-            string contentType= 'text/html';
+            string contentType= 'image/jpeg';
             system.debug('contentType:'+contentType);
 			String url = 'callout:Connect_to_S3';
             

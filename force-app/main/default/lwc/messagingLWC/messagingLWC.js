@@ -14,18 +14,20 @@ export default class MessagingLWC extends LightningElement {
     subscription = {};
     error;
     @api recordId;
-    @api fileName;
-    @api fileData;
-    @api fileType;
+    @api fileName='';
+    @api fileData='';
+    @api fileType='';
     @api channelName = '/event/NewMessage__e';
     @api offSetVal='';
-    @track messages = [];
+    @track messagesWrapper = [];
     @track contactName;
     @track isLoading = false;
     @track imageDataUrl='';
+    @api objectApiName;
     
     connectedCallback(){
         this.handleSubscribe();
+        console.log('Object Name====',this.objectApiName);
     }
 
     //checks whether show Send Button Enabled or Disabled
@@ -38,7 +40,7 @@ export default class MessagingLWC extends LightningElement {
     messageRecs(response) {
         if (response.data) {
             this.wiredMessagesResult = response;
-            this.messages = (response.data.messages);
+            this.messagesWrapper = response.data.messageWithAttachments;
             this.contactName = response.data.contactRecord.Name;
             this.offSetVal = response.data.defaultOffSet;
             setTimeout(() => {
@@ -49,6 +51,7 @@ export default class MessagingLWC extends LightningElement {
         }
     }
 
+
     // Method to get the input which User Entered
     handleInputChange(event) {
         this.inputValue = event.target.value;
@@ -58,11 +61,20 @@ export default class MessagingLWC extends LightningElement {
     handleSendClick() {
         this.imageDataUrl = '';
         console.log('In handleSendClick----');
-        this.createMessageRecord();   
+        if(/\(|\)/.test(this.fileName)){
+            this.inputValue = '';
+            this.fileData = '';
+            this.fileName  = '';
+            this.fileType = '';
+            console.log('Cannot contain bracket');
+        }else{
+            this.createMessageRecord();   
+        }
+        
     }
 
     createMessageRecord(){
-        createMessage({ messageBody: this.inputValue, contactId: this.recordId, fileName: this.fileName, fileData: this.fileData , fileType : this.fileType})
+        createMessage({ messageBody: this.inputValue, contactId: this.recordId, fileName: this.fileName, fileData: this.fileData ,filetype : this.fileType})
         .then(() => {
             this.inputValue = '';
             refreshApex(this.wiredMessagesResult);
@@ -83,23 +95,42 @@ export default class MessagingLWC extends LightningElement {
     // Calling Apex Method to Load More Messages when scrollBar moves
     loadMoreMessages() {
         const scrollContainer = this.template.querySelector('.slds-chat-list-container');
-        if (scrollContainer.scrollTop < 150 && !this.isLoading) {
+        if (scrollContainer.scrollTop < 250 && !this.isLoading) {
             this.isLoading = true;
             let newOffSetVal = parseInt(this.offSetVal) - 5;
             getMessages({ contactId: this.recordId , offSetValFromUI : newOffSetVal})
             .then((result) => {
-                this.messages = (result.messages);
+                this.messagesWrapper = this.createMessageData(result.messageWithAttachments);
                 this.offSetVal = result.defaultOffSet;
                 this.error = undefined;
                 this.isLoading = false;
             })
             .catch((error) => {
                 this.error = error;
-                this.messages = undefined;
+                this.messagesWrapper = undefined;
             });
         }
     }
-
+    
+    createMessageData(messageData) {
+        console.log('messageData--' + JSON.stringify(messageData));
+        let messageWrapperList=[];
+        messageData.forEach(item => {
+            const messageRecord = {
+                messageRec: item.messageRec,
+            };
+           
+            if (item.attachmentLinks != null && item.attachmentLinks != 'undefined') {
+                messageRecord.attachmentLinks = item.attachmentLinks;
+                console.log('lmessageData.attachmentLink-----',JSON.stringify(messageRecord.attachmentLink));
+            }
+            messageWrapperList.push(messageRecord);
+            console.log('messageRec--' + JSON.stringify(messageRecord));
+        });
+        return messageWrapperList;
+    }
+    
+    
     // Handles when any new incoming records pops up
     handleSubscribe() {
         const self = this;
@@ -132,13 +163,10 @@ export default class MessagingLWC extends LightningElement {
             var base64 = reader.result.split(',')[1];
             this.fileName = file.name;
             this.fileData = base64;
-            this.fileType = file.fileType;
+            this.fileType = file.type;
         }
         reader.readAsDataURL(file); 
-        console.log('this.fileName-----',JSON.stringify(this.fileName));
-        console.log('this.fileData-----',JSON.stringify(this.fileData));
-        console.log('this.FileType-----',JSON.stringify(this.fileType));
-
+        console.log('file type---',file.type);
         const selectedFile = event.target.files[0];
         if (selectedFile) {
             this.readFile(selectedFile);
@@ -148,9 +176,11 @@ export default class MessagingLWC extends LightningElement {
 
     readFile(file) {
         const reader = new FileReader();
-
+        console.log('file----'+JSON.stringify(file));
+        console.log('event.target.result----'+JSON.stringify(event.target.result));
         reader.onload = (event) => {
             this.imageDataUrl = event.target.result;
+            console.log('Image Data Url----'+this.imageDataUrl);
         };
 
         reader.readAsDataURL(file);

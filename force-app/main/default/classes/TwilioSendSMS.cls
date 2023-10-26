@@ -29,11 +29,6 @@ public class TwilioSendSMS {
         req.setBody(reqBody);
         res = http.send(req);
         
-        System.debug('mmsUrl---'+mmsUrl);
-        System.debug('Request----'+req);
-        System.debug('Request Body---'+req.getBody());
-        System.debug('Response Body---'+res.getBody());
-        
         Message__c messageRec = [SELECT ID,Is_Delivered__c FROM Message__c WHERE Id =: messageRecId];
         
         if(String.ValueOf(res.getStatusCode()) == '201'){
