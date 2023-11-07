@@ -8,8 +8,6 @@
     <targetConfigs>
         <targetConfig targets="lightning__RecordPage">
             <property name="channelName" type="String" />
-            <property name="selectedValue" type="String" label="Select an option" datasource="options.value"/>
-            <property name="selectedPhoneValue"  type="String" label="Select the Phone Field" datasource="apex://GetPicklistValueForMessagingApp" />
         </targetConfig>
     </targetConfigs>
 </LightningComponentBundle>

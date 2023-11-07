@@ -1,3 +1,7 @@
+/* Class Name : TwilioReceiveSMS
+   Author : Sweta
+   Description : This is a class for receiving messages from Twilio.
+*/
 @RestResource(urlMapping='/TwilioReceiveSMS/*')
 global class TwilioReceiveSMS {
     
@@ -21,23 +25,17 @@ global class TwilioReceiveSMS {
         }    
         
         if(String.isNotBlank(fromPhoneNumber)){
-            Contact conRec = [SELECT Id FROM Contact WHERE Phone = :fromPhoneNumber WITH USER_MODE LIMIT 1 ];
-            if (conRec != null) {
-                Message__c messageRec = new Message__c(
+            Message__c messageRec = new Message__c(
                 Is_Outbound__c = false,
                 Message_Content__c = smsBody,
                 Recipient_Number__c = toNumber,
-                Sender_Number__c = fromPhoneNumber,
-                Contact__c = conRec.Id
-            	);
-                
-                try {
-                    insert as User messageRec;
-                } catch (Exception e) {
-                    System.debug('Error while saving SMS message: ' + e.getMessage());
-                }
-            } else {
-                System.debug('No matching contact found for phone number: ' + fromPhoneNumber);
+                Sender_Number__c = fromPhoneNumber
+            );
+            
+            try {
+                insert as User messageRec;
+            } catch (Exception e) {
+                System.debug('Error while saving SMS message: ' + e.getMessage());
             }
         }
     }

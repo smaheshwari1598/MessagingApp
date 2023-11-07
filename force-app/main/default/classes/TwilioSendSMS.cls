@@ -1,42 +1,51 @@
+/* Class Name : TwilioSendSMS
+   Author : Sweta
+   Description : This is a helper class for doing callout to Twilio.
+*/
+
 public class TwilioSendSMS {
      
     @future(callout = true)
-    public static void sendSMS(String messageRecId,String smsBody, String toNumber,String mmsUrl){
-        
-        String namedCredential = 'callout:TwilioConfig'; // Use the Named Credential's name
-        String endPoint = namedCredential + '/'+Label.Twilio_Acount_Username+'/Messages.json';
-        String senderNumber = Constants.SENDER_NUMBER;
-        String reqBody = '';
-        
-        HttpRequest req = new HttpRequest();
-        Http http = new Http();
-        HTTPResponse res = new HTTPResponse();
-        req.setEndpoint(endPoint);
-        req.setMethod('POST');
-        
-        String version  = '3.2.0';
-        req.setHeader('X-Twilio-Client', 'salesforce-' + version);
-        req.setHeader('User-Agent', 'twilio-salesforce/' + version);
-        req.setHeader('Accept', 'application/json');
-        req.setHeader('Accept-Charset', 'utf-8');
-        
-        reqBody = 'To=' + EncodingUtil.urlEncode(toNumber, 'UTF-8') + '&From=' + EncodingUtil.urlEncode(senderNumber,'UTF-8') + '&Body=' + EncodingUtil.urlEncode(smsBody,'UTF-8');
-        
-        if(String.isNotBlank(mmsUrl)){
-            reqBody += '&MediaUrl='+ EncodingUtil.urlEncode(mmsUrl,'UTF-8');
-        }
+    public static void sendSMS(String messageRecId, String toNumber, List<String> mmsUrls) {
+        if(String.IsNotBlank(messageRecId)){
+            Message__c messageRec = [SELECT ID, Is_Delivered__c,Message_Content__c FROM Message__c WHERE Id = :messageRecId WITH SECURITY_ENFORCED];
             
-        req.setBody(reqBody);
-        res = http.send(req);
-        
-        Message__c messageRec = [SELECT ID,Is_Delivered__c FROM Message__c WHERE Id =: messageRecId];
-        
-        if(String.ValueOf(res.getStatusCode()) == '201'){
-            messageRec.Is_Delivered__c = true;
-        }else{
-            messageRec.Is_Delivered__c = false;
-            System.debug('Error Occured while delievery Message. Error Message----'+res.getBody());
+            HttpRequest request = new HttpRequest();
+            String smsBody = (String.IsNotBlank(messageRec.Message_Content__c))?EncodingUtil.urlEncode(messageRec.Message_Content__c, 'UTF-8'):'';
+            String senderNumber = Constants.SENDER_NUMBER;
+            String endPoint = 'callout:TwilioConfig/' + Label.Twilio_Acount_Username + '/Messages.json';
+            String reqBody = 'To=' + EncodingUtil.urlEncode(toNumber, 'UTF-8') +
+                            '&From=' + EncodingUtil.urlEncode(senderNumber, 'UTF-8') +
+                            '&Body=' + smsBody;
+            
+            if (!mmsUrls.isEmpty()) {
+                for (String mmsUrl : mmsUrls) {
+                    reqBody += '&MediaUrl=' + EncodingUtil.urlEncode(mmsUrl, 'UTF-8');
+                }  
+            }
+            
+            request.setBody(reqBody);
+            request.setEndpoint(endPoint);
+            request.setMethod('POST');
+            
+            request.setHeader('X-Twilio-Client', 'salesforce-3.2.0');
+            request.setHeader('User-Agent', 'twilio-salesforce/3.2.0');
+            request.setHeader('Accept', 'application/json');
+            request.setHeader('Accept-Charset', 'utf-8');
+            
+            HTTPResponse res;
+            try {
+                res = HTTPCalloutService.doCallout(request);
+                if (String.valueOf(res.getStatusCode()) == '201'){
+                    messageRec.Is_Delivered__c = true;
+                }else{
+                    messageRec.Is_Delivered__c = false;
+                    System.debug('Error Occurred while delivering Message. Error Message: ' + res.getBody());
+                }
+                update as User messageRec;
+            } catch (Exception e) {
+                System.debug('Error Occurred : ' + e.getMessage());
+            }
         }
-        update messageRec;
     }
 }

@@ -2,17 +2,16 @@ import { LightningElement, track, api, wire } from 'lwc';
 import getMessages from '@salesforce/apex/MessagingLWCController.getMessages';
 import createMessage from '@salesforce/apex/MessagingLWCController.createMessage';
 import getRecordDetails from '@salesforce/apex/MessagingLWCController.getRecordDetails';
+import insertAttachments from '@salesforce/apex/MessagingLWCController.calloutToS3';
 import { refreshApex } from '@salesforce/apex';
 import { subscribe} from 'lightning/empApi';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 
-const MAX_FILE_SIZE = 100000000; //10mb 
-export default class MessagingLWC extends LightningElement {
-
+export default class MessagingApp extends LightningElement {
+    
     inputValue='';
     wiredMessagesResult;
     subscription = {};
-    @api selectedValue = 'Option1';
     error;
     @api recordId;
     @api fileName='';
@@ -23,25 +22,25 @@ export default class MessagingLWC extends LightningElement {
     @track messagesWrapper = [];
     @track contactName;
     @track isLoading = false;
-    @track imageDataUrl='';
+    @track imageDataUrl=[];
     @api objectApiName;
-    @api selectedPhoneValue;
+    @track showSpinner = true;
+    @track fileContents=[];
     
     connectedCallback(){
         this.handleSubscribe();
-        console.log('Object Name====',this.objectApiName);
-        console.log('recordId====',this.recordId);
     }
 
     //checks whether show Send Button Enabled or Disabled
     get sendButtonClass() {
-        return (this.inputValue.trim() == '' && this.imageDataUrl.trim() =='') ? true : false;
+        return (this.inputValue.trim() == '' && this.fileContents.length < 1) ? true : false;
     }
 
     // Method to get the Messages record related to Contact
-    @wire(getMessages,{ recordId: '$recordId' , offSetValFromUI : '',objectApiName: '$objectApiName', phoneFieldName : 'Phone', nameField : 'Name'}) 
+    @wire(getMessages,{ recordId: '$recordId' , offSetValFromUI : '',objectApiName: '$objectApiName'}) 
     messageRecs(response) {
         if (response.data) {
+            this.showSpinner = false;
             this.wiredMessagesResult = response;
             this.messagesWrapper = response.data.messageWithAttachments;
             this.contactName = response.data.contactPersonName;
@@ -54,7 +53,6 @@ export default class MessagingLWC extends LightningElement {
         }
     }
 
-
     // Method to get the input which User Entered
     handleInputChange(event) {
         this.inputValue = event.target.value;
@@ -62,7 +60,6 @@ export default class MessagingLWC extends LightningElement {
 
     // Called when User Clicks on Send Icon Button
     handleSendClick() {
-        this.imageDataUrl = '';
         console.log('In handleSendClick----');
         if(/\(|\)/.test(this.fileName)){
             this.inputValue = '';
@@ -71,21 +68,60 @@ export default class MessagingLWC extends LightningElement {
             this.fileType = '';
             console.log('Cannot contain bracket');
         }else{
-            this.createMessageRecord();   
+            this.createMessageRecord()
+            .then(result => {
+                console.log('In createMessageRecord result---',JSON.stringify(result));
+                this.inputValue = '';
+                this.imageDataUrl='';
+                return this.createAttachmentsRecords(result);
+            })
+            .then(result => {
+                const toastEvent = new ShowToastEvent({
+                    title: 'Success',
+                    message: 'Second method completed successfully',
+                    variant: 'success',
+                });
+                this.dispatchEvent(toastEvent);
+            })
+            .catch(error => {
+                console.error('Error: ' + error);
+                const toastEvent = new ShowToastEvent({
+                    title: 'Error',
+                    message: 'An error occurred',
+                    variant: 'error',
+                });
+                this.dispatchEvent(toastEvent);
+            });
+            this.imageDataUrl = '';
         }
-        
     }
 
     createMessageRecord(){
-        createMessage({ messageBody: this.inputValue, recordId: this.recordId, fileName: this.fileName, fileData: this.fileData ,filetype : this.fileType, objectApiName: this.objectApiName, phoneFieldName : 'Phone', nameField : 'Name'})
-        .then(() => {
-            this.inputValue = '';
-            refreshApex(this.wiredMessagesResult);
-        })
-        .catch(error => {
-            console.error(error);
+        return new Promise((resolve, reject) => {
+            createMessage({ messageBody: this.inputValue, recordId: this.recordId, fileContents : this.fileContents, objectApiName: this.objectApiName})
+            .then(result => {
+                    refreshApex(this.wiredMessagesResult);
+                    resolve(result);
+                })
+                .catch(error => {
+                    reject(error);
+                });
         });
     }
+
+    createAttachmentsRecords(messageRecordId) {
+        return new Promise((resolve, reject) => {
+            insertAttachments({ recordId: this.recordId, fileContents : this.fileContents, objectApiName: this.objectApiName,messageRecId: messageRecordId })
+                .then(result => {
+                    this.fileContents = [];
+                    resolve(result);
+                })
+                .catch(error => {
+                    reject(error);
+                });
+        });
+    }
+
 
     // JavaScript function to scroll to the bottom of the chat container
     scrollToBottom() {
@@ -101,7 +137,7 @@ export default class MessagingLWC extends LightningElement {
         if (scrollContainer.scrollTop < 250 && !this.isLoading) {
             this.isLoading = true;
             let newOffSetVal = parseInt(this.offSetVal) - 5;
-            getMessages({ recordId: this.recordId , offSetValFromUI : newOffSetVal, objectApiName: this.objectApiName, phoneFieldName : 'Phone', nameField : 'Name'})
+            getMessages({ recordId: this.recordId , offSetValFromUI : newOffSetVal, objectApiName: this.objectApiName})
             .then((result) => {
                 this.messagesWrapper = this.createMessageData(result.messageWithAttachments);
                 this.offSetVal = result.defaultOffSet;
@@ -116,7 +152,6 @@ export default class MessagingLWC extends LightningElement {
     }
     
     createMessageData(messageData) {
-        console.log('messageData--' + JSON.stringify(messageData));
         let messageWrapperList=[];
         messageData.forEach(item => {
             const messageRecord = {
@@ -125,7 +160,6 @@ export default class MessagingLWC extends LightningElement {
            
             if (item.attachmentLinks != null && item.attachmentLinks != 'undefined') {
                 messageRecord.attachmentLinks = item.attachmentLinks;
-                console.log('lmessageData.attachmentLink-----',JSON.stringify(messageRecord.attachmentLink));
             }
             messageWrapperList.push(messageRecord);
             console.log('messageRec--' + JSON.stringify(messageRecord));
@@ -138,10 +172,9 @@ export default class MessagingLWC extends LightningElement {
     handleSubscribe() {
         const self = this;
         let phoneNumberFieldValue = '';
-        getRecordDetails({ recordId: this.recordId, objectApiName: this.objectApiName, phoneFieldName : 'Phone', nameField : 'Name'})
+        getRecordDetails({ recordId: this.recordId, objectApiName: this.objectApiName})
         .then((result) => {
-            phoneNumberFieldValue = result.get('Phone');
-            console.log('phoneNumberFieldValue----',phoneNumberFieldValue);
+            phoneNumberFieldValue = result.Phone;
         })
         .catch(error => {
             console.error(error)
@@ -161,42 +194,30 @@ export default class MessagingLWC extends LightningElement {
     }
 
     triggerFileInput() {
-        // Trigger the hidden file input
         const fileInput = this.template.querySelector('input[type="file"]');
         fileInput.click();
-        console.log('In triggerFileInput');
-
     }
-
+    
     handleFileUpload(event) {
-        console.log('In handleFileUpload');
-        const file = event.target.files[0];
-        var reader = new FileReader();
-        reader.onload = () => {
-            var base64 = reader.result.split(',')[1];
-            this.fileName = file.name;
-            this.fileData = base64;
-            this.fileType = file.type;
+        const files = event.target.files;
+        
+        if (files && files.length > 0) {
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const reader = new FileReader();
+    
+                reader.onload = (event) => {
+                    this.imageDataUrl.push(event.target.result);
+                    console.log('this.ImageUrl---', this.imageDataUrl);
+                    this.fileContents.push({
+                        fileName: file.name,
+                        fileData: event.target.result.split(',')[1],
+                        fileType: file.type
+                    });
+                };
+                reader.readAsDataURL(file);
+            }
         }
-        reader.readAsDataURL(file); 
-        console.log('file type---',file.type);
-        const selectedFile = event.target.files[0];
-        if (selectedFile) {
-            this.readFile(selectedFile);
-        }
-
-    }
-
-    readFile(file) {
-        const reader = new FileReader();
-        console.log('file----'+JSON.stringify(file));
-        console.log('event.target.result----'+JSON.stringify(event.target.result));
-        reader.onload = (event) => {
-            this.imageDataUrl = event.target.result;
-            console.log('Image Data Url----'+this.imageDataUrl);
-        };
-
-        reader.readAsDataURL(file);
     }
 
     showToast(title, message, variant) {
@@ -207,5 +228,4 @@ export default class MessagingLWC extends LightningElement {
         });
         this.dispatchEvent(toastEvent);
     }
-
 }

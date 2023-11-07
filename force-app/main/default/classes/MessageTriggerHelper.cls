@@ -9,8 +9,7 @@ public class MessageTriggerHelper {
         for (Message__c message : newMessages) {
              NewMessage__e newMessageEvent = new NewMessage__e(
                 Sender__c = message.Sender_Number__c,
-                Recipient__c = message.Recipient_Number__c,
-                recordId__c = message.Contact__c
+                Recipient__c = message.Recipient_Number__c
             );
     
             newMessageEvents.add(newMessageEvent);

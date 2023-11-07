@@ -1,22 +1,32 @@
+/* Class Name : MessagingLWCController
+   Author : Sweta
+   Description : This is a helper class for MessagingApp LWC which is used to send messages and media Messages.
+*/
 public class MessagingLWCController {
     
+    /* Description : Used to get messages to display in Conversation View. 
+    */
     @AuraEnabled(cacheable = true)
-    public static MessagingWrapper getMessages(String contactId, String offSetValFromUI){
+    public static MessagingWrapper getMessages(String recordId, String offSetValFromUI,String objectApiName){
+
+        String phoneFieldName = getPhoneFieldName(objectApiName);
+        
         MessagingWrapper msgWrapper;
-        Integer totalMessagesCount = [SELECT Count() FROM Message__c WHERE Contact__c = :contactId WITH USER_MODE];
+        SObject recordDetail = getRecordDetails(recordId,objectApiName);
+        Integer totalMessagesCount = calTotalMessages((String)recordDetail.get(phoneFieldName));
         Integer offSetVal=0;
         
-        String strQuery = 'Select Id,Is_Outbound__c, Message_Content__c, CreatedBy.name, CreatedDate,Is_Delivered__c,Contact__r.Name FROM Message__c WHERE Contact__c = \'' + contactId + '\'';
+        String strQueryForMessage = 'Select Id,Is_Outbound__c, Message_Content__c, CreatedBy.name, CreatedDate,Is_Delivered__c FROM Message__c WHERE Sender_Number__c= \'' + (String)recordDetail.get(phoneFieldName) + '\'';
+        strQueryForMessage += ' OR Recipient_Number__c= \'' + (String)recordDetail.get(phoneFieldName) + '\'';
         
         if(totalMessagesCount > Integer.ValueOf(Label.MessagePerPage)){
             offSetVal = calOffSetValue(totalMessagesCount,offSetValFromUI);
         }
-        strQuery += (totalMessagesCount > Integer.ValueOf(Label.MessagePerPage) && String.IsBlank(offSetValFromUI))?(' ORDER BY CreatedDate LIMIT '+ Label.MessagePerPage):'';
+        strQueryForMessage += (totalMessagesCount > Integer.ValueOf(Label.MessagePerPage) && String.IsBlank(offSetValFromUI))?(' ORDER BY CreatedDate LIMIT '+ Label.MessagePerPage):'';
         
-        Contact conRec = getContactDetails(contactId);
-        strQuery += ' OFFSET '+ offSetVal;
+        strQueryForMessage += ' OFFSET '+ offSetVal;
         
-        List<Message__c> listOfMessages = Database.query(strQuery,AccessLevel.USER_MODE);
+        List<Message__c> listOfMessages = Database.query(strQueryForMessage,AccessLevel.USER_MODE);
         
         List<Id> listOfMessageIds = new List<Id>();
         for(Message__c messageRec : listOfMessages){
@@ -50,11 +60,35 @@ public class MessagingLWCController {
             listOfMessageDetailsWithAttachment.add(messagedetail);
         }
         
-        msgWrapper = new MessagingWrapper(conRec, listOfMessageDetailsWithAttachment,offSetVal);
-        System.debug('msgWrapper-----'+msgWrapper);
+        msgWrapper = new MessagingWrapper((String)recordDetail.get('Name'), listOfMessageDetailsWithAttachment,offSetVal);
         return msgWrapper;
+
     }
     
+    /* Description : Used to get Phone field Name from Custom Metadata. 
+    */
+    public static String getPhoneFieldName(String objectApiName){
+        Object_Name_with_Phone_Field__mdt messageCustomMetadataRecord = Object_Name_with_Phone_Field__mdt.getInstance(objectApiName);
+        return messageCustomMetadataRecord.Phone_Field_API_Name__c;
+    }
+
+    /* Description : Used to get Record Details based on recrdId and ObjectAPIName. 
+    */
+    @AuraEnabled(cacheable = true)
+    public static SObject getRecordDetails(String recordId,String objectApiName){
+        String phoneFieldName = getPhoneFieldName(objectApiName);
+        String query = 'SELECT Id,'+phoneFieldName+','+'Name' + ' FROM '+objectApiName +' WHERE Id='+'\'' +recordId+'\''+' LIMIT 1';
+        return Database.query(query);
+    }
+    
+    /* Description : Used to calculate number of messages related to that phone number. 
+    */
+    public static Integer calTotalMessages(String phoneNumber){
+        return [SELECT Count() FROM Message__c WHERE Sender_Number__c=:phoneNumber OR Recipient_Number__c =:phoneNumber WITH USER_MODE];
+    }
+    
+    /* Description : Helper method used to calculate Offset Value . 
+    */
     public static Integer calOffSetValue(Integer totalMessagesCount, String offSetValFromUI){
         Integer offSetVal=0;
          
@@ -65,95 +99,111 @@ public class MessagingLWCController {
         }
     }
     
+    /* Description : Used to create Message__c and attachments . 
+    */
     @AuraEnabled
-    public static void createMessage(String messageBody,String contactId, String fileName, String fileData,String filetype){
+    public static String createMessage(String messageBody,String recordId, List<FileContent> fileContents ,String objectApiName){
         try {
-            String mmsUrl='';
-            String messageRecId = '';
-            Contact contactDetails = getContactDetails(contactId);
-            System.debug('filetype----'+filetype);
-            
-            if(String.IsNotBlank(fileData) && fileData != ''){
-                String formattedDateString = Datetime.now().formatGMT('EEE, dd MMM yyyy HH:mm:ss z');
-                String mmsSharedUrl = '';
-                String endPointUrl = 'callout:Connect_to_s3' +'/'+ EncodingUtil.urlEncode(fileName, 'UTF-8');
-                HttpRequest req  = new HttpRequest();
-                HttpResponse resFromS3  = new HttpResponse();
-                
-                req.setMethod('PUT');
-                req.setEndpoint(endPointUrl);
-                req.setHeader('Content-Encoding', 'UTF-8');
-                req.setHeader('Content-type', filetype);
-                req.setHeader('Connection', 'keep-alive');
-                req.setHeader('Date', formattedDateString);
-                req.setHeader('ACL', 'public-read');
-                
-                req.setBodyAsBlob(EncodingUtil.base64Decode(fileData));
-                
-                Http http = new Http();
-                resFromS3 = http.send(req);
-                
-                System.debug('FILE CONTENT:' +  fileData);
-                System.debug('FILE NAME: ' + fileName);
-                System.debug('*Resp:' + String.ValueOF(resFromS3.getBody()));
-                System.debug('RESPONSE STRING: ' + resFromS3.toString());
-                System.debug('RESPONSE STATUS: ' + resFromS3.getStatus());
-                System.debug('STATUS_CODE: ' + resFromS3.getStatusCode());
-                
-                if(resFromS3.getStatusCode() == 200){
-                    mmsUrl = 'https://mypublicfilesbucketforsalesforce.s3.eu-north-1.amazonaws.com' + '/'+ filename;
-                    messageRecId = createMessageRecord(messageBody,contactId);
-                    insertAttachments(messageRecId,fileName,contactId,fileData);
-                }
-            }else{
-                messageRecId = createMessageRecord(messageBody,contactId);
+            String phoneFieldName = getPhoneFieldName(objectApiName);
+            List<String> listOfMMSurls = new List<String>();
+            SObject recordDetail = getRecordDetails(recordId,objectApiName);
+            String messageRecId = createMessageRecord(messageBody,recordId,(String)recordDetail.get(phoneFieldName));
+            if(!fileContents.isEmpty()){
+                insertAttachments(messageRecId,fileContents);
             }
-            TwilioSendSMS.SendSMS(messageRecId,messageBody,contactDetails.Phone,mmsUrl);
-        } catch (Exception e) {
+            return messageRecId;
+        }catch (Exception e) {
             System.debug('Error while saving SMS message: ' + e.getMessage());
-        }        
+        } 
+        return null;
     }
     
-    public static void insertAttachments(Id parentRecordId,String fileName, String contactId,String fileData){
-        ContentVersion cVersion = new ContentVersion();
-        cVersion.PathOnClient = fileName;//File name with extention
-        cVersion.FirstPublishLocationId = parentRecordId;  
-        cVersion.Title = fileName;//Name of the file
-        cVersion.VersionData = EncodingUtil.base64Decode(fileData);//File content
-        insert cVersion;
-        
-        //After saved the Content Verison, get the ContentDocumentId
-        ContentVersion conDocument = [SELECT Id,ContentDocumentId, title FROM ContentVersion WHERE Id =:cVersion.Id];
-        
-        ContentDocument contentDocument = [SELECT FileType FROM ContentDocument WHERE Id = :conDocument.ContentDocumentId LIMIT 1];
-        
+    /* Description : Used to do callout to s3 . 
+    */
+    @AuraEnabled
+    public static void calloutToS3(String recordId, List<FileContent> fileContents ,String objectApiName,String messageRecId){
+        try {
+            String phoneFieldName = getPhoneFieldName(objectApiName);
+            List<String> listOfMMSurls = new List<String>();
+            SObject recordDetail = getRecordDetails(recordId,objectApiName);
+            if(!fileContents.isEmpty()){
+                for(FileContent fileContentRec : fileContents){
+                    
+					HttpRequest request = new HttpRequest();
+                    String endPointUrl = 'callout:Connect_to_s3' +'/'+ EncodingUtil.urlEncode(fileContentRec.fileName, 'UTF-8');
+                    String formattedDateString = Datetime.now().formatGMT('EEE, dd MMM yyyy HH:mm:ss z');
+
+                    request.setHeader('Content-Encoding', 'UTF-8');
+                    request.setHeader('Content-type', fileContentRec.filetype);
+                    request.setHeader('Connection', 'keep-alive');
+                    request.setHeader('Date', formattedDateString);
+                    request.setHeader('ACL', 'public-read');
+					request.setBodyAsBlob(EncodingUtil.base64Decode(fileContentRec.fileData));
+                    request.setEndpoint(endPointUrl);
+                    request.setMethod('PUT');
+                    
+                    HTTPResponse resFromS3 = HTTPCalloutService.doCallout(request);
+                    
+                    if(resFromS3.getStatusCode() == 200){
+                        listOfMMSurls.add('https://mypublicfilesbucketforsalesforce.s3.eu-north-1.amazonaws.com' + '/'+ fileContentRec.filename);
+                    }
+                }
+            }
+            if(String.IsNotBlank(messageRecId)){
+				TwilioSendSMS.SendSMS(messageRecId,(String)recordDetail.get(phoneFieldName),listOfMMSurls);                
+            }
+        }catch (Exception e) {
+            System.debug('Error doing Callout: ' + e.getMessage());
+        } 
     }
     
-    public static String createMessageRecord(String messageBody,String contactId){
-        Contact conRec = getContactDetails(contactId);
+    /* Description : Used to insert Attachments . 
+    */
+    public static void insertAttachments(Id parentRecordId,List<FileContent> fileContents){
+        List<ContentVersion> listOfContentVersions = new List<Contentversion>();
+        for(FileContent file : fileContents){
+            ContentVersion cVersion = new ContentVersion();
+            cVersion.PathOnClient = file.fileName;//File name with extention
+            cVersion.FirstPublishLocationId = parentRecordId;  
+            cVersion.Title = file.fileName;//Name of the file
+            cVersion.VersionData = EncodingUtil.base64Decode(file.fileData);//File content
+            listOfContentVersions.add(cVersion);
+        }
+        if(!listOfContentVersions.isEmpty())
+        insert as User listOfContentVersions; 
+    }
+    
+    /* Description : Used to create Message__c record instance . 
+    */
+    public static String createMessageRecord(String messageBody,String recordId,String recipientNumber){
         Message__c messageRec = new Message__c(
             Is_Outbound__c = true,
             Message_Content__c = messageBody,
-            Recipient_Number__c = conRec.Phone,
-            Sender_Number__c = Constants.SENDER_NUMBER,
-            Contact__c = contactId);
+            Recipient_Number__c = recipientNumber,
+            Sender_Number__c = Constants.SENDER_NUMBER
+            );
         insert as user messageRec;
         return messageRec.Id;
     }
     
-    public static Contact getContactDetails(String contactId){
-        return [SELECT Id, Phone, Name from Contact where Id =:contactId LIMIT 1];
-    }
+   public class FileContent{
+        @AuraEnabled
+        public String fileName{get;set;}
+        @AuraEnabled
+        public String fileData{get;set;}
+        @AuraEnabled
+        public String fileType{get;set;}
+   }
 
     public class MessagingWrapper{
         @AuraEnabled
-        public Contact contactRecord{get;set;}
+        public String contactPersonName{get;set;}
         @AuraEnabled
         public List<MessageDetailsWithAttachment> messageWithAttachments{get;set;}
         @AuraEnabled
         public Integer defaultOffSet{get;set;}
-        public MessagingWrapper(Contact contactRecord,List<MessageDetailsWithAttachment> messageWithAttachments,Integer defaultOffSet){
-            this.contactRecord = contactRecord;
+        public MessagingWrapper(String contactPersonName,List<MessageDetailsWithAttachment> messageWithAttachments,Integer defaultOffSet){
+            this.contactPersonName = contactPersonName;
             this.messageWithAttachments = messageWithAttachments;
             this.defaultOffSet = defaultOffSet;
         }
